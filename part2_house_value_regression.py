@@ -116,13 +116,21 @@ class Regressor(nn.Module):
         #######################################################################
 
         # Apply the preprocessing to the dataset
-        if not training:
+        preprocessed_y = None
+        if training:
+            preprocessed_data = self.preprocessor.fit_transform(x)
+            if y is not None:
+                preprocessed_y = self.y_preprocessor.fit_transform(y)
+        else:
             preprocessed_data = self.preprocessor.transform(x)
             if y is not None:
                 preprocessed_y = self.y_preprocessor.transform(y)
+
         preprocessed_data = torch.tensor(preprocessed_data, dtype=torch.float32)
+        if preprocessed_y is not None:
+            preprocessed_y = torch.tensor(preprocessed_y, dtype=torch.float32)
         
-        return preprocessed_data
+        return preprocessed_data, preprocessed_y
 
 
         #######################################################################
@@ -150,12 +158,12 @@ class Regressor(nn.Module):
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
     
-        X_train = self._preprocessor(x_train)
+        X_train, _ = self._preprocessor(x_train)
         Y_train = torch.tensor(y_train.values, dtype=torch.float32).view(-1, 1)
         train_dataset = TensorDataset(X_train, Y_train)
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
 
-        X_val = self._preprocessor(x_val)
+        X_val, _ = self._preprocessor(x_val)
         Y_val = torch.tensor(y_val.values, dtype=torch.float32).view(-1, 1)
 
         training_rmse = []
@@ -241,7 +249,7 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        X = self._preprocessor(x, training=False)  # Preprocess inputs
+        X, _ = self._preprocessor(x, training=False)  # Preprocess inputs
         Y = torch.tensor(y.values, dtype=torch.float32).view(-1, 1)  # Ensure Y is the correct shape
         
         self.model.eval()

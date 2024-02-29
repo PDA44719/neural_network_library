@@ -688,8 +688,8 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._max_value = data.max()
-        self._min_value = data.min()
+        self._max_value = data.max(axis=0)
+        self._min_value = data.min(axis=0)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
