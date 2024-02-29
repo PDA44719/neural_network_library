@@ -1,21 +1,11 @@
 import torch
-import torch.nn as nn
 import pickle
 import numpy as np
 import pandas as pd
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
 
-class Regressor(nn.Module):
+class Regressor():
 
-    def __init__(self, x, nb_epoch=1000, batch_size=16, learning_rate=0.001, loss_fn=nn.MSELoss(), model=None):
+    def __init__(self, x, nb_epoch = 1000):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -33,64 +23,16 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        super(Regressor, self).__init__()
-        
-        self.nb_epoch = nb_epoch
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.loss_fn = loss_fn
-        
-        # Initialize the preprocessor with the training data
-        self.preprocessor, self.input_size = self._initialise_preprocessor(x)
-        
+        # Replace this code with your own
+        X, _ = self._preprocessor(x, training = True)
+        self.input_size = X.shape[1]
         self.output_size = 1
-
-        # Define the model architecture
-        if model is None:
-            self.model = nn.Sequential(
-                nn.Linear(self.input_size, 64),
-                nn.ReLU(),
-                nn.Linear(64, 30),
-                nn.ReLU(),
-                nn.Linear(30, 10),
-                nn.ReLU(),
-                nn.Linear(10, self.output_size),
-                # nn.ReLU(),
-            )
-        else:
-            self.model = model
-            
-
-        self.optimiser = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.nb_epoch = nb_epoch 
+        return
 
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-
-    def _initialise_preprocessor(self, x):
-        numerical_cols = x.select_dtypes(include=['int64', 'float64']).columns
-        categorical_cols = x.select_dtypes(include=['object']).columns
-
-        numerical_pipeline = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='median')),  # Filling missing values with median
-            ('scaler', StandardScaler()),  # Standardizing the numerical features
-        ])
-
-        categorical_pipeline = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),  # Handling missing categories
-            ('onehot', OneHotEncoder(handle_unknown='ignore')),  # Encoding categorical features
-        ])
-
-        preprocessor = ColumnTransformer(transformers=[
-            ('num', numerical_pipeline, numerical_cols),
-            ('cat', categorical_pipeline, categorical_cols),
-        ])
-
-        preprocessed_x = preprocessor.fit_transform(x)
-        input_size = preprocessed_x.shape[1]
-
-        return preprocessor, input_size
-
 
     def _preprocessor(self, x, y = None, training = False):
         """ 
@@ -115,15 +57,9 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        # Apply the preprocessing to the dataset
-        if not training:
-            preprocessed_data = self.preprocessor.transform(x)
-            if y is not None:
-                preprocessed_y = self.y_preprocessor.transform(y)
-        preprocessed_data = torch.tensor(preprocessed_data, dtype=torch.float32)
-        
-        return preprocessed_data
-
+        # Replace this code with your own
+        # Return preprocessed x and y, return None for y if it was None
+        return x, (y if isinstance(y, pd.DataFrame) else None)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -148,44 +84,7 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
-    
-        X_train = self._preprocessor(x_train)
-        Y_train = torch.tensor(y_train.values, dtype=torch.float32).view(-1, 1)
-        train_dataset = TensorDataset(X_train, Y_train)
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-
-        X_val = self._preprocessor(x_val)
-        Y_val = torch.tensor(y_val.values, dtype=torch.float32).view(-1, 1)
-
-        training_rmse = []
-        validation_rmse = []
-        start_epoch = 10  # Epoch from which to start recording the RMSE
-
-        for epoch in range(self.nb_epoch):
-            self.model.train()
-            total_loss = 0
-            for inputs, targets in train_loader:
-                self.optimiser.zero_grad()
-                predictions = self.model(inputs)
-                loss = self.loss_fn(predictions, targets)
-                loss.backward()
-                self.optimiser.step()
-                total_loss += loss.item()
-
-            if epoch >= start_epoch:
-                # Compute RMSE for training and append to list
-                train_rmse = np.sqrt(total_loss / len(train_loader))
-                training_rmse.append(train_rmse)
-
-                # Compute RMSE for validation and append to list
-                self.model.eval()
-                with torch.no_grad():
-                    val_predictions = self.model(X_val)
-                    val_loss = self.loss_fn(val_predictions, Y_val).item()
-                val_rmse = np.sqrt(val_loss)
-                validation_rmse.append(val_rmse)
-                
+        X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
         return self
 
         #######################################################################
@@ -210,14 +109,8 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        X = self._preprocessor(x, training=False)  # Preprocess inputs
-        
-        self.model.eval()  # Set the model to evaluation mode
-        
-        with torch.no_grad():
-            predictions = self.model(X)
-        return predictions.numpy()
-
+        X, _ = self._preprocessor(x, training = False) # Do not forget
+        pass
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -241,17 +134,8 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        X = self._preprocessor(x, training=False)  # Preprocess inputs
-        Y = torch.tensor(y.values, dtype=torch.float32).view(-1, 1)  # Ensure Y is the correct shape
-        
-        self.model.eval()
-        with torch.no_grad():
-            predictions = self.model(X)
-        
-        mse = mean_squared_error(Y.numpy(), predictions.numpy())
-        rmse = np.sqrt(mse)  # Compute the RMSE from MSE
-        return rmse
-
+        X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
+        return 0 # Replace this code with your own
 
         #######################################################################
         #                       ** END OF YOUR CODE **
