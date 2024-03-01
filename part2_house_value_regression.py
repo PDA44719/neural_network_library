@@ -212,7 +212,7 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        X = self._preprocessor(x, training=False)  # Preprocess inputs
+        X, _ = self._preprocessor(x, training=False)  # Preprocess inputs
         
         self.model.eval()  # Set the model to evaluation mode
         
@@ -244,15 +244,11 @@ class Regressor(nn.Module):
         #######################################################################
 
         X, _ = self._preprocessor(x, training=False)  # Preprocess inputs
-        print('Made it here')
         Y = torch.tensor(y.values, dtype=torch.float32).view(-1, 1)  # Ensure Y is the correct shape
-        print('Made it there')
         
         self.model.eval()
         with torch.no_grad():
             predictions = self.model(X)
-        
-        print('Made it here lol')
         
         mse = mean_squared_error(y.values, predictions.numpy())
         rmse = np.sqrt(mse)  # Compute the RMSE from MSE
