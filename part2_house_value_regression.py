@@ -42,7 +42,7 @@ class Regressor(nn.Module):
         
         # Initialize the preprocessor with the training data
         self.preprocessor, self.input_size = self._initialise_preprocessor(x)
-        
+        self.y_preprocessor = StandardScaler()
         self.output_size = 1
 
         # Define the model architecture
