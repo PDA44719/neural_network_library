@@ -123,7 +123,7 @@ class Regressor(nn.Module):
             preprocessed_data = self.preprocessor.transform(x)
         preprocessed_data = torch.tensor(preprocessed_data, dtype=torch.float32)
         if y is not None:
-            y = torch.tensor(y, dtype=torch.float32)
+            y = torch.tensor(y.values, dtype=torch.float32)
         
         return preprocessed_data, y
 
