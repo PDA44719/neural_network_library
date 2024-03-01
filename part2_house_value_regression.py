@@ -12,10 +12,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
+from sklearn.model_selection import KFold
 
 class Regressor(nn.Module):
 
-    def __init__(self, x, nb_epoch=800, batch_size=16, learning_rate=0.01, loss_fn=nn.MSELoss(), model=None):
+    def __init__(self, x, nb_epoch=800, batch_size=64, learning_rate=0.01, loss_fn=nn.MSELoss(), model=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -161,7 +162,8 @@ class Regressor(nn.Module):
 
         training_rmse = []
         validation_rmse = []
-        start_epoch = 10  # Epoch from which to start recording the RMSE
+        # Epoch from which to start recording the RMSE for better visualisation & to reduce noise
+        start_epoch = 10  
 
         for epoch in range(self.nb_epoch):
             self.model.train()
@@ -186,7 +188,7 @@ class Regressor(nn.Module):
                     val_loss = self.loss_fn(val_predictions, Y_val).item()
                 val_rmse = np.sqrt(val_loss)
                 validation_rmse.append(val_rmse)
-            print(f'Epoch {epoch+1}, Training RMSE: {train_rmse if epoch >= start_epoch else "N/A"}, Validation RMSE: {val_rmse if epoch >= start_epoch else "N/A"}')
+            # print(f'Epoch {epoch+1}, Training RMSE: {train_rmse if epoch >= start_epoch else "N/A"}, Validation RMSE: {val_rmse if epoch >= start_epoch else "N/A"}')
 
         '''plots
         plt.figure(figsize=(10, 5))
@@ -198,7 +200,7 @@ class Regressor(nn.Module):
         plt.legend()
         plt.grid(True)
         plt.show()
-         '''
+        '''
         return self
 
         #######################################################################
@@ -293,7 +295,7 @@ def load_regressor():
 
 
 
-def perform_hyperparameter_search(): 
+def perform_hyperparameter_search(x, y): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
@@ -336,7 +338,7 @@ def perform_hyperparameter_search():
             print(f"Evaluated model with LR={lr}, batch size={batch_size}, Validation RMSE={val_rmse}")
 
     # Saving the best model
-    save_regressor(best_model)
+    # save_regressor(best_model)
     
     print(f"Best hyperparameters found: {best_hyperparams}, with RMSE: {best_rmse}")
     return best_hyperparams, best_model
@@ -345,6 +347,53 @@ def perform_hyperparameter_search():
     #                       ** END OF YOUR CODE **
     #######################################################################
 
+def cross_validate_model(x, y, n_splits=10):
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    rmse_scores = []
+
+    for train_index, val_index in kf.split(x):
+        x_train, x_val = x.iloc[train_index], x.iloc[val_index]
+        y_train, y_val = y.iloc[train_index], y.iloc[val_index]
+
+        # Initialize the model with training data
+        model = Regressor(x_train, nb_epoch=800, batch_size=64, learning_rate=0.01)
+        
+        # Fit the model
+        model.fit(x_train, y_train)
+        
+        # Evaluate the model on the validation set and store the RMSE
+        model_rmse = model.score(x_val, y_val)
+        rmse_scores.append(model_rmse)
+
+    average_rmse = np.mean(rmse_scores)
+    print(f"Average RMSE across all folds: {average_rmse}")
+    return average_rmse
+
+'''
+def kfold_main():
+    
+    output_label = "median_house_value"
+
+    # Use pandas to read CSV data as it contains various object types
+    # Feel free to use another CSV reader tool
+    # But remember that LabTS tests take Pandas DataFrame as inputs
+    data = pd.read_csv("housing.csv") 
+    # Prepare the features (X) and target (y)
+    x = data.loc[:, data.columns != output_label]
+    y = data.loc[:, [output_label]]
+
+    # Ensure that the target is in the correct format (might not be necessary depending on your dataset)
+    y = y.astype(float)
+
+    # Perform 10-fold cross-validation
+    average_rmse = cross_validate_model(x, y)
+
+    print(f"Average RMSE from 10-fold cross-validation: {average_rmse}")
+
+# Ensure to define the cross_validate_model function before this
+if __name__ == "__main__":
+    kfold_main()
+'''
 
 def example_main():
 
