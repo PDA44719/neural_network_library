@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 class Regressor(nn.Module):
 
-    def __init__(self, x, nb_epoch=1000, batch_size=16, learning_rate=0.001, loss_fn=nn.MSELoss(), model=None, y_preprocessor=None):
+    def __init__(self, x, nb_epoch=1000, batch_size=16, learning_rate=0.001, loss_fn=nn.MSELoss(), model=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -42,7 +42,6 @@ class Regressor(nn.Module):
         
         # Initialize the preprocessor with the training data
         self.preprocessor, self.input_size = self._initialise_preprocessor(x)
-        self.y_preprocessor = y_preprocessor
         
         self.output_size = 1
 
@@ -123,7 +122,7 @@ class Regressor(nn.Module):
             preprocessed_data = self.preprocessor.transform(x)
         preprocessed_data = torch.tensor(preprocessed_data, dtype=torch.float32)
         if y is not None:
-            y = torch.tensor(y.values, dtype=torch.float32)
+            y = torch.tensor(y.values, dtype=torch.float32).view(-1, 1)
         
         return preprocessed_data, y
 
@@ -251,7 +250,7 @@ class Regressor(nn.Module):
         with torch.no_grad():
             predictions = self.model(X)
         
-        mse = mean_squared_error(Y.numpy(), predictions.numpy())
+        mse = mean_squared_error(y.values, predictions.numpy())
         rmse = np.sqrt(mse)  # Compute the RMSE from MSE
         return rmse
 
