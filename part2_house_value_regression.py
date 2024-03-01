@@ -188,7 +188,7 @@ class Regressor(nn.Module):
                     val_loss = self.loss_fn(val_predictions, Y_val).item()
                 val_rmse = np.sqrt(val_loss)
                 validation_rmse.append(val_rmse)
-            print(f'Epoch {epoch+1}, Training RMSE: {train_rmse if epoch >= start_epoch else "N/A"}, Validation RMSE: {val_rmse if epoch >= start_epoch else "N/A"}')
+            # print(f'Epoch {epoch+1}, Training RMSE: {train_rmse if epoch >= start_epoch else "N/A"}, Validation RMSE: {val_rmse if epoch >= start_epoch else "N/A"}')
 
         '''plots
         plt.figure(figsize=(10, 5))
