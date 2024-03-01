@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 class Regressor(nn.Module):
 
-    def __init__(self, x, nb_epoch=1000, batch_size=16, learning_rate=0.001, loss_fn=nn.MSELoss(), model=None):
+    def __init__(self, x, nb_epoch=800, batch_size=16, learning_rate=0.01, loss_fn=nn.MSELoss(), model=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -55,7 +55,6 @@ class Regressor(nn.Module):
                 nn.Linear(30, 10),
                 nn.ReLU(),
                 nn.Linear(10, self.output_size),
-                # nn.ReLU(),
             )
         else:
             self.model = model
@@ -187,7 +186,19 @@ class Regressor(nn.Module):
                     val_loss = self.loss_fn(val_predictions, Y_val).item()
                 val_rmse = np.sqrt(val_loss)
                 validation_rmse.append(val_rmse)
-                
+            print(f'Epoch {epoch+1}, Training RMSE: {train_rmse if epoch >= start_epoch else "N/A"}, Validation RMSE: {val_rmse if epoch >= start_epoch else "N/A"}')
+
+        '''plots
+        plt.figure(figsize=(10, 5))
+        plt.plot(range(start_epoch + 1, self.nb_epoch + 1), training_rmse, label='Training RMSE')
+        plt.plot(range(start_epoch + 1, self.nb_epoch + 1), validation_rmse, label='Validation RMSE')
+        plt.title('Training and Validation RMSE from Epoch ' + str(start_epoch + 1))
+        plt.xlabel('Epochs')
+        plt.ylabel('RMSE')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+         '''
         return self
 
         #######################################################################
@@ -300,12 +311,39 @@ def perform_hyperparameter_search():
     #                       ** START OF YOUR CODE **
     #######################################################################
 
-    return  # Return the chosen hyper parameters
+    learning_rates = [0.01, 0.001, 0.0001]
+    batch_sizes = [16, 32, 64]
+    epoch_numbers = [700, 800, 900]
+
+    best_rmse = float('inf')
+    best_hyperparams = {}
+    best_model = None
+
+    for lr in learning_rates:
+        for batch_size in batch_sizes:
+            regressor = Regressor(x, nb_epoch=800, batch_size=batch_size, learning_rate=lr)
+            regressor.fit(x, y)
+                
+            # Evaluate on the validation set
+            _, x_val, _, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
+            val_rmse = regressor.score(x_val, y_val)
+                
+            if val_rmse < best_rmse:
+                best_rmse = val_rmse
+                best_hyperparams = {'learning_rate': lr, 'batch_size': batch_size}
+                best_model = regressor
+
+            print(f"Evaluated model with LR={lr}, batch size={batch_size}, Validation RMSE={val_rmse}")
+
+    # Saving the best model
+    save_regressor(best_model)
+    
+    print(f"Best hyperparameters found: {best_hyperparams}, with RMSE: {best_rmse}")
+    return best_hyperparams, best_model
 
     #######################################################################
     #                       ** END OF YOUR CODE **
     #######################################################################
-
 
 
 def example_main():
@@ -325,7 +363,7 @@ def example_main():
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch = 10)
+    regressor = Regressor(x_train, nb_epoch = 800)
     regressor.fit(x_train, y_train)
     save_regressor(regressor)
 
@@ -336,4 +374,3 @@ def example_main():
 
 if __name__ == "__main__":
     example_main()
-

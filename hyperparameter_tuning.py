@@ -11,11 +11,14 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
+import copy
 import matplotlib.pyplot as plt
+import seaborn as sns
+from copy import deepcopy
 
 class Regressor(nn.Module):
 
-    def __init__(self, x, nb_epoch=100, batch_size=16, learning_rate=0.0001, loss_fn=nn.MSELoss(), model=None):
+    def __init__(self, x, nb_epoch=1000, batch_size=16, learning_rate=0.001, loss_fn=nn.MSELoss(), model=None):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -42,7 +45,6 @@ class Regressor(nn.Module):
         
         # Initialize the preprocessor with the training data
         self.preprocessor, self.input_size = self._initialise_preprocessor(x)
-        self.y_preprocessor = StandardScaler()
         
         self.output_size = 1
 
@@ -51,12 +53,11 @@ class Regressor(nn.Module):
             self.model = nn.Sequential(
                 nn.Linear(self.input_size, 64),
                 nn.ReLU(),
-                nn.Linear(64, 64),
+                nn.Linear(64, 30),
                 nn.ReLU(),
-                nn.Linear(64, 64),
+                nn.Linear(30, 10),
                 nn.ReLU(),
-                nn.Linear(64, self.output_size),
-                # nn.ReLU(), # No activation function for the output layer
+                nn.Linear(10, self.output_size),
             )
         else:
             self.model = model
@@ -93,7 +94,7 @@ class Regressor(nn.Module):
         return preprocessor, input_size
 
 
-    def _preprocessor(self, x, y=None, training=False):
+    def _preprocessor(self, x, y = None, training = False):
         """ 
         Preprocess input of the network.
           
@@ -115,48 +116,24 @@ class Regressor(nn.Module):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        
-        # Process the features
-        preprocessed_data = self.preprocessor.fit_transform(x) if training else self.preprocessor.transform(x)
-        preprocessed_data = torch.tensor(preprocessed_data, dtype=torch.float32)
-        
-        preprocessed_y = None
-        if y is not None:
-            y_reshaped = y.values.reshape(-1, 1) if isinstance(y, pd.DataFrame) else np.array(y).reshape(-1, 1)
-            preprocessed_y = self.y_preprocessor.fit_transform(y_reshaped) if training else self.y_preprocessor.transform(y_reshaped)
-            preprocessed_y = torch.tensor(preprocessed_y, dtype=torch.float32).view(-1, 1)
-        
-        # print(preprocessed_data, preprocessed_y)
-        return preprocessed_data, (preprocessed_y if y is not None else None)
-    
-        '''
+
         # Apply the preprocessing to the dataset
-        if not training:
+        if training:
+            preprocessed_data = self.preprocessor.fit_transform(x)
+        else:
             preprocessed_data = self.preprocessor.transform(x)
-            if y is not None:
-                preprocessed_y = self.y_preprocessor.transform(y)
         preprocessed_data = torch.tensor(preprocessed_data, dtype=torch.float32)
-        
-        return preprocessed_data
-        
-        
-        # Process the features
-        preprocessed_data = self.preprocessor.transform(x)
-        
-        preprocessed_y = None
         if y is not None:
-            y_reshaped = y.values.reshape(-1, 1) if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series) else np.array(y).reshape(-1, 1)
-            preprocessed_y = self.y_preprocessor.transform(y_reshaped)
-            preprocessed_y = torch.tensor(preprocessed_y, dtype=torch.float32).view(-1, 1)
+            y = torch.tensor(y.values, dtype=torch.float32).view(-1, 1)
         
-        return preprocessed_data, (preprocessed_y if y is not None else None)
-        '''
+        return preprocessed_data, y
+
 
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
 
-        
+    
     def fit(self, x, y):
         """
         Regressor training function
@@ -175,64 +152,47 @@ class Regressor(nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
     
-        x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
-    
-        X_train, Y_train = self._preprocessor(x_train, y_train, training=True)
-        X_val, Y_val = self._preprocessor(x_val, y_val, training=False)
 
-        '''
-        if Y_train is not None:
-            train_dataset = TensorDataset(X_train, Y_train)
-        else:
-            train_dataset = TensorDataset(X_train)
-        '''
+        x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
+
+        X_train, _ = self._preprocessor(x_train)
+        Y_train = torch.tensor(y_train.values, dtype=torch.float32).view(-1, 1)
         train_dataset = TensorDataset(X_train, Y_train)
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        
-        '''
-        x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
-        
-        # X_train, Y_train = self._preprocessor(x_train, y_train, training=True)
-        # X_val, Y_val = self._preprocessor(x_val, y_val, training=False)
-    
-        X_train = self._preprocessor(x_train)
-        Y_train = torch.tensor(y_train.values, dtype=torch.float32).view(-1, 1)
-        
-        X_val = self._preprocessor(x_val)
+
+        X_val, _ = self._preprocessor(x_val)
         Y_val = torch.tensor(y_val.values, dtype=torch.float32).view(-1, 1)
 
-        train_dataset = TensorDataset(X_train, Y_train)
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        '''
-        training_rmse = []
-        validation_rmse = []
-        start_epoch = 10  # Epoch from which to start recording the RMSE
+        validation_rmse = []  # Initialize outside the loop
+        best_val_rmse = float('inf')
+        best_model = None
 
         for epoch in range(self.nb_epoch):
             self.model.train()
-            total_loss = 0
             for inputs, targets in train_loader:
                 self.optimiser.zero_grad()
                 predictions = self.model(inputs)
                 loss = self.loss_fn(predictions, targets)
                 loss.backward()
                 self.optimiser.step()
-                total_loss += loss.item()
 
-            if epoch >= start_epoch:
-                # Compute RMSE for training and append to list
-                train_rmse = np.sqrt(total_loss / len(train_loader))
-                training_rmse.append(train_rmse)
+            self.model.eval()
+            with torch.no_grad():
+                val_predictions = self.model(X_val)
+                val_loss = self.loss_fn(val_predictions, Y_val).item()
+            current_val_rmse = np.sqrt(val_loss)
 
-                # Compute RMSE for validation and append to list
-                self.model.eval()
-                with torch.no_grad():
-                    val_predictions = self.model(X_val)
-                    val_loss = self.loss_fn(val_predictions, Y_val).item()
-                val_rmse = np.sqrt(val_loss)
-                validation_rmse.append(val_rmse)
-                
-        return self
+            if epoch >= 10:  # Record RMSE from epoch 10 onwards
+                validation_rmse.append(current_val_rmse)
+
+            if current_val_rmse < best_val_rmse:
+                best_val_rmse = current_val_rmse
+                best_model = deepcopy(self.model)
+
+            print(f'Epoch {epoch+1}, Validation RMSE: {current_val_rmse}')
+
+        # Ensure the best_model is returned correctly
+        return best_model, validation_rmse
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -294,9 +254,7 @@ class Regressor(nn.Module):
         with torch.no_grad():
             predictions = self.model(X)
         
-        # Inverse transform the predictions before calculating RMSE
-        # predictions = self.y_preprocessor.inverse_transform(predictions.numpy())
-        mse = mean_squared_error(Y.numpy(), predictions.numpy())
+        mse = mean_squared_error(y.values, predictions.numpy())
         rmse = np.sqrt(mse)  # Compute the RMSE from MSE
         return rmse
 
@@ -326,9 +284,40 @@ def load_regressor():
     print("\nLoaded model in part2_model.pickle\n")
     return trained_model
 
+def perform_hyperparameter_search(x, y): 
+    learning_rates = [0.01, 0.001, 0.0001]
+    batch_sizes = [16, 32, 64]
+    epoch_numbers = [700, 800, 900]
+
+    best_rmse = float('inf')
+    best_hyperparams = {}
+    best_model = None
+
+    for lr in learning_rates:
+        for batch_size in batch_sizes:
+            regressor = Regressor(x, nb_epoch=800, batch_size=batch_size, learning_rate=lr)
+            regressor.fit(x, y)
+                
+            # Evaluate on the validation set
+            _, x_val, _, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
+            val_rmse = regressor.score(x_val, y_val)
+                
+            if val_rmse < best_rmse:
+                best_rmse = val_rmse
+                best_hyperparams = {'learning_rate': lr, 'batch_size': batch_size}
+                best_model = regressor
+
+            print(f"Evaluated model with LR={lr}, batch size={batch_size}, Validation RMSE={val_rmse}")
+
+    # Saving the best model
+    save_regressor(best_model)
+    
+    print(f"Best hyperparameters found: {best_hyperparams}, with RMSE: {best_rmse}")
+    return best_hyperparams, best_model
 
 
-def perform_hyperparameter_search(): 
+    '''
+def perform_hyperparameter_search(x, y): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
@@ -346,14 +335,41 @@ def perform_hyperparameter_search():
     #                       ** START OF YOUR CODE **
     #######################################################################
 
-    return  # Return the chosen hyper parameters
+    batch_sizes = [16, 32, 64, 128]
+    learning_rates = [0.1, 0.01, 0.001, 0.0001]
+    
+    best_rmse = float('inf')
+    best_model = None
+
+    for batch_size in batch_sizes:
+        for lr in learning_rates:
+            regressor = Regressor(x, nb_epoch=800, batch_size=batch_size, learning_rate=lr)
+            validation_rmse, _ = regressor.fit(x, y)
+            
+            
+            best_rmse = min(validation_rmse)
+            best_model = regressor
+
+            # Plot the RMSE from epoch 10 onwards
+            plt.figure(figsize=(10, 6))
+            plt.plot(range(11, 801), validation_rmse[10:], label=f'LR={lr}, Batch={batch_size}')
+            plt.xlabel('Epoch')
+            plt.ylabel('Validation RMSE')
+            plt.title(f'Validation RMSE over Epochs (LR={lr}, Batch={batch_size})')
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+            print(f"Learning Rate: {lr}, Batch Size: {batch_size}, Best Validation RMSE: {best_rmse}")
+
+    best_hyperparams = {'learning_rate': best_model.learning_rate, 'batch_size': best_model.batch_size}
+    return best_model, best_hyperparams
 
     #######################################################################
     #                       ** END OF YOUR CODE **
     #######################################################################
 
-
-
+'''
 def example_main():
 
     output_label = "median_house_value"
@@ -364,22 +380,48 @@ def example_main():
     data = pd.read_csv("housing.csv") 
 
     # Splitting input and output
-    x_train = data.loc[:, data.columns != output_label]
-    y_train = data.loc[:, [output_label]]
+    x = data.loc[:, data.columns != output_label]
+    y = data.loc[:, [output_label]]
 
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch = 10)
-    regressor.fit(x_train, y_train)
-    save_regressor(regressor)
+    best_hyperparams, best_model = perform_hyperparameter_search(x, y)
+    print(f"Best Hyperparameters: {best_hyperparams}")
+    save_regressor(best_model)
 
     # Error
-    error = regressor.score(x_train, y_train)
-    print(f"\nRegressor error: {error}\n")
+    error = best_model.score(x, y)
+    print(f"\nRegressor error on the training set: {error}\n")
 
 
 if __name__ == "__main__":
     example_main()
+'''
+def hyperparameter_tuning_main():
 
+    output_label = "median_house_value"
+
+    data = pd.read_csv('housing.csv')
+
+    # # Splitting input and output
+    x = data.loc[:, data.columns != output_label]
+    y = data.loc[:, [output_label]]
+
+    best_model, best_hyperparams = perform_hyperparameter_search(x, y)
+    print(f"Best Hyperparameters: {best_hyperparams}")
+
+    # print(f"Best Hyperparameters: {best_hyperparams}, Best Validation Loss: {best_validation_loss}")  # Corrected
+    # print(f"Best regressor score (on test data): {best_model.score(x_val, y_val)}")
+
+    save_regressor(best_model)
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+    test_score = best_model.score(x_test, y_test)
+    print(f"Best model score on unseen test data: {test_score}")
+
+if __name__ == "__main__":
+    example_main()
+    
+'''
