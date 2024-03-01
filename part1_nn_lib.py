@@ -326,8 +326,8 @@ class LinearLayer(Layer):
         self._grad_W_current = None
         self._grad_b_current = None
         
-        self._W = np.random.rand(n_in, n_out)
-        self._b = np.random.rand(1, n_out)
+        self._W = xavier_init((n_in, n_out))
+        self._b = np.zeros((1, n_out))
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -373,8 +373,9 @@ class LinearLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._grad_W_current = np.matmul(self._cache_current.transpose(), grad_z)
-        self._grad_b_current = np.matmul(np.ones(shape=(1, grad_z.shape[0])), grad_z)
+        x = self._cache_current
+        self._grad_W_current = np.matmul(x.transpose(), grad_z)
+        self._grad_b_current = np.sum(grad_z, axis=0, keepdims=True)
         return np.matmul(grad_z, self._W.transpose())
 
         #######################################################################
